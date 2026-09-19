@@ -37,6 +37,12 @@ export function legalMoves(s: Game, die = s.die): number[] {
   if (s.winner !== -1 || die < 1 || die > 6) return [];
   return s.pieces[s.current].flatMap((position, index) => position === OUT && die === 6 || position >= 0 && position < FINISH && position + die <= FINISH ? [index] : []);
 }
+/** Automatically pick a pawn only if exactly one move is legal. */
+export function onlyLegalMove(s: Game): number | null {
+  if (s.phase !== 'choose') return null;
+  const options = legalMoves(s);
+  return options.length === 1 ? options[0] : null;
+}
 function nextTurn(s: Game): Game {
   const turn = (s.turn + 1) % s.seats.length;
   return { ...s, turn, current: s.seats[turn], phase: 'roll', die: 0, sixStreak: 0, bank: [], message: `Vez de ${COLORS[s.seats[turn]]}.` };
@@ -89,11 +95,18 @@ export function move(game: Game, token: number): MoveResult | null {
   const won = finished && s.pieces[color].every(p => p === FINISH);
   let result: Game;
   if (won) result = { ...s, winner: color, phase: 'finished', bank: [], message: `${COLORS[color]} venceu!` };
-  else if (s.bankSixes) {
-    s.bank.shift();
-    result = consumeBank(s);
-  } else if (s.die === 6) result = { ...s, phase: 'roll', message: '6! Lance o dado novamente.' };
-  else result = nextTurn(s);
+  else {
+    // A move earns at most one additional throw, even if a six also captures.
+    // Banked dice remain available when a capture/finish interrupts their consumption.
+    const bonus = captured.length > 0 || finished || s.die === 6;
+    const bonusMessage = captured.length ? 'Captura! Você ganhou outra jogada.' : finished ? 'Peão chegou! Lance novamente.' : '6! Lance o dado novamente.';
+    if (s.bankSixes) {
+      s.bank.shift();
+      // In this variant, a six has already awarded its additional throw before moving.
+      result = captured.length || finished ? { ...s, phase: 'roll', die: 0, message: bonusMessage } : consumeBank(s);
+    } else if (bonus) result = { ...s, phase: 'roll', die: 0, message: bonusMessage };
+    else result = nextTurn(s);
+  }
   return { state: result, from, to, captured, event: won ? 'win' : captured.length ? 'capture' : finished ? 'finish' : 'move' };
 }
 export function bestCpuMove(s: Game): number {
