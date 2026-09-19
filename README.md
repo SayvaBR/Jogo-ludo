@@ -1,18 +1,31 @@
-# Ludo Nativo · Godot 4.6.3
+# Ludo React · Android
 
-Jogo Android criado em Godot 4/GDScript, sem dependências de terceiros. Este repositório contém um motor de regras separado da interface, tabuleiro vetorial, partidas locais de 2–4 jogadores, modo contra CPU, salvamento automático, variante de acumular 6 e pipeline de compilação de APK.
+Jogo mobile offline em React 19, TypeScript, Vite e Capacitor 8. Migrado do protótipo Godot para uma única stack de interface; regras reimplementadas como funções puras e testáveis, com CPU, 2–4 jogadores locais, salvamento automático, tabuleiro SVG, animações por casa e variante opcional de acumular dados com 6.
 
-## Regras documentadas
-Usamos uma variante digital explícita: quatro peões por jogador; um 6 libera peão na casa inicial e concede outra jogada; três 6 consecutivos encerram a vez; oito casas seguras (quatro saídas e quatro estrelas); pousar sobre adversários em casa não segura captura; entrada na reta final após completar o percurso; chegada com dado exato; vence quem levar quatro peões ao centro. Peões aliados podem compartilhar casas, sem formar bloqueio; captura/chegada não concedem dado extra. Regras tradicionais variam por edição.
+## Executar
 
-Fontes: https://www.mastersofgames.com/rules/ludo-rules-instructions-guide.htm ; https://www.gamevelvet.com/ludo-online/rules ; https://docs.godotengine.org/en/4.6/tutorials/export/exporting_for_android.html
+```bash
+npm install
+npm test
+npm run dev
+npm run build
+```
 
-## Abrir
-Instale Godot 4.6.3 Standard, abra `project.godot`, execute o projeto. Para obter o APK: GitHub Actions > Testes e APK Android > Run workflow; após sucesso, baixe artifact `ludo-android-debug` (ZIP contendo o APK). O APK é de teste, não um lançamento na Google Play.
+## APK Android
 
-## Testes locais
-`godot --headless --editor --path . --import --quit`
-`godot --headless --path . --script tests/rules_test.gd`
+Em **Actions > React Ludo / Android APK**, execute **Run workflow**; após sucesso, baixe o artifact `ludo-android-debug`, descompacte e instale o APK. A compilação também roda em push e PR. Build de depuração para testes, não assinado para publicação na Play Store. Requer npm/Node 22, Android SDK e JDK 21 para compilar localmente: `npm install && npm run build && npx cap add android && npx cap sync android && cd android && ./gradlew assembleDebug`.
 
-## Status
-Código inicial implementado. Testes e compilação dependem de CI verde, e a validação manual em aparelhos reais ainda é necessária. Online, áudio, monetização e assinatura de produção não estão implementados. Nunca adicione keystores de produção ao repositório.
+## Regras implementadas
+
+- Quatro peças por jogador, entrada com 6 e rolagem extra ao tirar 6.
+- Três 6 consecutivos perdem o turno; jogadas já executadas permanecem.
+- 52 casas externas, oito casas seguras e cinco casas na reta final; chegada exata na posição 57.
+- Captura em casa não segura, devolvendo o adversário à base; aliados podem compartilhar casas, sem bloqueios.
+- Vence quem terminar as quatro peças. Captura e chegada não concedem bônus na variante clássica escolhida.
+- **Acumular 6** é variante opcional: ao tirar 6, joga novamente antes de mover; após resultado diferente de 6, consome a fila de dados em ordem. O terceiro 6 cancela a fila.
+
+As regras secundárias do Ludo variam entre edições. A configuração acima é a variante digital documentada neste projeto, não uma alegação de regras universais. Referências: https://www.mastersofgames.com/rules/ludo-rules-instructions-guide.htm e https://ludo-helpdesk.dynamicnext.com/support/solutions/articles/4000222082-rules-specials .
+
+## Limites atuais
+
+Sem multiplayer online, matchmaking, monetização, ranking online nem validação manual em dispositivos reais. A interface utiliza áudio gerado localmente e fontes do sistema quando offline; nenhuma lógica do jogo exige conexão. Não confundir APK de depuração com app pronto para publicar.

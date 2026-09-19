@@ -1,9 +1,7 @@
-.godot/
-.import/
-build/
+node_modules/
+dist/
+android/
+.env
 *.apk
 *.aab
-*.keystore
-*.jks
-export_credentials.cfg
 .DS_Store

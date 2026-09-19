@@ -1,77 +1,38 @@
-name: Testes e APK Android
-
+name: React Ludo / Android APK
 on:
   push:
-    branches: [main]
+    branches: [main, feat/react-mobile-ludo]
   pull_request:
   workflow_dispatch:
-
 permissions:
   contents: read
-
 jobs:
-  android:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    env:
-      GODOT_VERSION: 4.6.3
-      GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
-      GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
-      - name: Configurar Java 17
-        uses: actions/setup-java@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
-      - name: Configurar Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: platform-tools
-          log-accepted-android-sdk-licenses: false
-      - name: Instalar Godot e templates oficiais
-        shell: bash
-        run: |
-          set -euo pipefail
-          curl -fL --retry 3 -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
-          unzip -q godot.zip
-          chmod +x "Godot_v${GODOT_VERSION}-stable_linux.x86_64"
-          sudo mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot
-          curl -fL --retry 3 -o templates.tpz "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
-          mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable" template-extract
-          unzip -q templates.tpz -d template-extract
-          cp template-extract/templates/* "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/"
-          godot --version
-      - name: Importar projeto e verificar scripts
-        run: godot --headless --editor --path . --import --quit
-      - name: Rodar testes automatizados de regras
-        run: godot --headless --path . --script tests/rules_test.gd
-      - name: Testar inicialização e interface
-        run: godot --headless --path . --script tests/smoke_test.gd
-      - name: Configurar ambiente de exportação Android
-        shell: bash
-        run: |
-          set -euo pipefail
-          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
-          test -x "${SDK}/platform-tools/adb"
-          SETTINGS="$(find "$HOME/.config/godot" -name 'editor_settings*.tres' -type f | head -n 1)"
-          if [ -z "$SETTINGS" ]; then
-            echo 'Godot editor settings not found' >&2
-            exit 1
-          fi
-          printf '\nexport/android/android_sdk_path = "%s"\nexport/android/java_sdk_path = "%s"\n' "$SDK" "$JAVA_HOME" >> "$SETTINGS"
-          keytool -genkeypair -v -keystore "$RUNNER_TEMP/ludo-debug.keystore" -storepass android -alias androiddebugkey -keypass android -dname 'CN=Ludo Debug,O=SayvaBR,C=BR' -keyalg RSA -keysize 2048 -validity 3650
-          echo "GODOT_ANDROID_KEYSTORE_DEBUG_PATH=$RUNNER_TEMP/ludo-debug.keystore" >> "$GITHUB_ENV"
-      - name: Exportar APK de depuração
-        shell: bash
-        run: |
-          mkdir -p build
-          godot --headless --path . --export-debug Android build/ludo-debug.apk
-          test -s build/ludo-debug.apk
-      - name: Publicar APK para download
-        uses: actions/upload-artifact@v4
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Verify game rules
+        run: npm test
+      - name: Type check and build web app
+        run: npm run build
+      - name: Generate Android project
+        run: npx cap add android && npx cap sync android
+      - name: Build debug APK
+        run: cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
         with:
           name: ludo-android-debug
-          path: build/ludo-debug.apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
