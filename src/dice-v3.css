@@ -1,0 +1,2 @@
+/* Never display a fake face 1 before the first throw or while the dice spins. */
+.dice-placeholder{grid-column:1 / -1;grid-row:1 / -1;display:grid;place-items:center;color:#273856;font-size:27px;line-height:1;font-weight:1000}
