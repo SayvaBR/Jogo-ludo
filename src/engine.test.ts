@@ -1,0 +1,80 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { newGame, roll, move, square, legalMoves, loadGame, bestCpuMove, FINISH, OUT } from './engine.ts';
+
+test('opposite seats and 4 tokens per player', () => {
+  const s = newGame(2);
+  assert.deepEqual(s.seats, [0,2]);
+  assert.equal(s.pieces[0].length, 4);
+  assert.equal(square(1,0),13);
+  assert.equal(square(2,51),25);
+});
+test('six needed to enter, immutable movement and extra roll', () => {
+  const fresh = newGame(2);
+  assert.deepEqual(legalMoves(fresh, 2), []);
+  assert.deepEqual(legalMoves(fresh, 6), [0,1,2,3]);
+  assert.equal(move(fresh,0), null);
+  const launched = roll(fresh,6);
+  assert.equal(fresh.phase,'roll');
+  assert.equal(launched.phase,'choose');
+  const moved = move(launched,0)!;
+  assert.equal(moved.to,0);
+  assert.equal(moved.state.pieces[0][0],0);
+  assert.equal(moved.state.phase,'roll');
+  assert.equal(launched.pieces[0][0],OUT);
+  const second = move(roll(moved.state,6),0)!;
+  assert.equal(second.to,6);
+  const third = roll(second.state,6);
+  assert.equal(third.current,2);
+  assert.equal(third.pieces[0][0],6);
+});
+test('no moves pass, exact finish and winner', () => {
+  const passed = roll(newGame(3),1);
+  assert.equal(passed.current,1);
+  const s = newGame(2);
+  s.pieces[0] = [56,FINISH,FINISH,FINISH];
+  assert.deepEqual(legalMoves(s,2), []);
+  assert.deepEqual(legalMoves(s,1), [0]);
+  const won = move(roll(s,1),0)!;
+  assert.equal(won.event,'win');
+  assert.equal(won.state.phase,'finished');
+  assert.equal(roll(won.state,6), won.state);
+});
+test('protected starts and opponent captures', () => {
+  const safe = newGame(2);
+  safe.pieces[2][0] = 26;
+  const safeResult = move(roll(safe,6),0)!;
+  assert.equal(safeResult.captured.length,0);
+  assert.equal(safeResult.state.pieces[2][0],26);
+  const s = newGame(2);
+  s.pieces[0][0] = 13;
+  s.pieces[2][1] = 40;
+  const hit = move(roll(s,1),0)!;
+  assert.equal(hit.event,'capture');
+  assert.deepEqual(hit.captured, [[2,1]]);
+  assert.equal(hit.state.pieces[2][1],OUT);
+});
+test('banked sixes, ordered consumption and third six forfeits', () => {
+  let s = roll(newGame(2,false,true),6);
+  assert.equal(s.phase,'roll');
+  s = roll(s,2);
+  assert.deepEqual(s.bank,[6,2]);
+  s = move(s,0)!.state;
+  assert.equal(s.die,2);
+  assert.equal(s.phase,'choose');
+  s = move(s,0)!.state;
+  assert.equal(s.pieces[0][0],2);
+  assert.equal(s.current,2);
+  s = roll(roll(roll(newGame(2,false,true),6),6),6);
+  assert.equal(s.current,2);
+  assert.deepEqual(s.bank,[]);
+});
+test('CPU legal, save validated and corrupt save rejected', () => {
+  const s = roll(newGame(4,true),6);
+  s.current = 1; s.turn = 1;
+  assert.ok(legalMoves(s).includes(bestCpuMove(s)));
+  assert.deepEqual(loadGame(JSON.stringify(s)), s);
+  assert.equal(loadGame('{oops'),null);
+  s.pieces[0][0] = 100;
+  assert.equal(loadGame(JSON.stringify(s)),null);
+});
