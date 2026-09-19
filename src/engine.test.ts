@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { newGame, roll, move, square, legalMoves, loadGame, bestCpuMove, onlyLegalMove, FINISH, OUT } from './engine.ts';
+import { newGame, roll, move, square, legalMoves, loadGame, bestCpuMove, onlyLegalMove, FINISH, OUT, SAFE, STARTS } from './engine.ts';
 
 test('opposite seats and 4 tokens per player', () => {
   const s = newGame(2);
   assert.deepEqual(s.seats, [0,2]);
   assert.equal(s.pieces[0].length, 4);
-  assert.equal(square(1,0),13);
-  assert.equal(square(2,51),25);
+  assert.equal(square(1,0),23);
+  assert.equal(square(2,51),37);
 });
 test('six needed to enter, immutable movement and extra roll', () => {
   const fresh = newGame(2);
@@ -118,7 +118,9 @@ test('a capture bonus does not discard the remaining banked dice', () => {
   const s = newGame(2,false,true);
   s.pieces[0][0]=13;
   s.pieces[2][0]=40;
-  s.bank=[1,2]; s.die=1; s.phase='choose';
+  s.bank=[1,2];
+  s.die=1;
+  s.phase='choose';
   const captured=move(s,0)!;
   assert.equal(captured.state.phase,'roll');
   assert.deepEqual(captured.state.bank,[2]);
@@ -144,4 +146,44 @@ test('safe-square landing never awards capture bonus and a six awards one throw'
   const hit=move(roll(six,6),0)!;
   assert.equal(hit.captured.length,1);
   assert.equal(hit.state.phase,'roll');
+});
+test('each entry matches its base and path connects to its own colored home lane', async () => {
+  const { TRACK, LANES, YARDS, tokenPoint } = await import('./board-path.ts');
+  const entrances = [[0,6],[6,14],[14,8],[8,0]];
+  const expectedLanes = [[1,7],[7,13],[13,7],[7,1]];
+  assert.equal(TRACK.length, 52);
+  assert.equal(new Set(TRACK.map(point => point.join(','))).size, 52);
+  for (let color=0;color<4;color++) {
+    assert.deepEqual(TRACK[square(color,0)],entrances[color]);
+    assert.deepEqual(LANES[color][0],expectedLanes[color]);
+    assert.deepEqual(tokenPoint(color,0,0),[entrances[color][0]*40+20,entrances[color][1]*40+20]);
+    const yard=YARDS[color][0];
+    assert.ok(Math.max(Math.abs(yard[0]-entrances[color][0]),Math.abs(yard[1]-entrances[color][1]))<=4);
+    let previous=TRACK[square(color,0)];
+    for(let progress=1;progress<52;progress++) {
+      const current=TRACK[square(color,progress)];
+      assert.ok(Math.max(Math.abs(previous[0]-current[0]),Math.abs(previous[1]-current[1]))===1, `${color}: disconnected track at ${progress}`);
+      previous=current;
+    }
+    const firstLane=LANES[color][0];
+    assert.equal(Math.abs(previous[0]-firstLane[0])+Math.abs(previous[1]-firstLane[1]),1, `${color}: wrong home-lane entry`);
+    for(let progress=52;progress<57;progress++) {
+      assert.deepEqual(tokenPoint(color,0,progress),LANES[color][progress-52].map(n=>n*40+20));
+    }
+  }
+});
+test('all four launch squares are safe, even when occupied by an opponent', () => {
+  for (let color=0;color<4;color++) {
+    assert.ok(SAFE.has(square(color,0)));
+    const s=newGame(4);
+    s.turn=color;
+    s.current=color;
+    const foe=(color+1)%4;
+    const opponentProgress=(STARTS[foe]-STARTS[color]+52)%52;
+    s.pieces[foe][0]=opponentProgress;
+    const result=move(roll(s,6),0)!;
+    assert.equal(result.to,0);
+    assert.equal(result.captured.length,0);
+    assert.equal(result.state.pieces[foe][0],opponentProgress);
+  }
 });
