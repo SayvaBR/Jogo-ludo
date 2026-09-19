@@ -32,8 +32,14 @@ Regras secundárias variam entre edições do Ludo; esta é a configuração esc
 
 ## Tabuleiro e movimento
 
-Tabuleiro refeito em SVG com bases em relevo, peões numerados, casas seguras com estrelas, acabamento responsivo e cores corretas nas quatro regiões do centro. Os movimentos interpolam a posição do peão em cada quadro usando `requestAnimationFrame`, no ritmo de atualização do navegador. **60 FPS é a meta; a taxa real depende do dispositivo e precisa ser medida em celulares reais.** Opção de reduzir animações disponível nas configurações e respeitada quando o sistema solicita movimento reduzido.
+Tabuleiro SVG com bases em relevo, peões numerados e casas seguras com estrelas. A saída de cada cor agora está corretamente vinculada à sua própria base, o sentido do percurso leva até seu corredor colorido e cada corredor conecta à última casa da volta completa, sem saltos. Os movimentos interpolam a posição do peão em cada quadro usando `requestAnimationFrame`. **60 FPS é uma meta, não uma taxa já medida em aparelhos reais.**
+
+## Dado justo e salvamento v3
+
+Cada face de 1 a 6 tem probabilidade teórica igual de **1/6 (16,67%)**. O aplicativo usa `crypto.getRandomValues` com amostragem por rejeição, removendo viés de módulo; repetições são naturais e não são artificialmente impedidas. Antes da primeira jogada e durante a rolagem, a face exibe `?`, nunca um 1 fictício. Testes verificam equilíbrio, amostragem, percurso e saídas.
+
+**Importante:** as partidas salvas com o tabuleiro antigo não serão retomadas nesta versão. O novo salvamento usa a versão 3 para não mover silenciosamente peças antigas para casas diferentes. Comece uma partida nova ao atualizar.
 
 ## Testes e limites
 
-`npm test` inclui regressões de captura com rolagem extra, chegada, movimento automático, casas protegidas e dados acumulados. Testes unitários e compilação no GitHub não substituem testes de interação e desempenho em aparelhos reais. Ainda sem multiplayer online, matchmaking, monetização ou publicação na Play Store.
+`npm test` inclui regressões de captura com rolagem extra, chegada, movimento automático, casas protegidas, dados acumulados, distribuição do dado e conexão dos quatro percursos. Testes e build no GitHub não substituem validação manual no Android. Ainda sem multiplayer online, matchmaking, monetização ou publicação na Play Store.
