@@ -26,6 +26,8 @@ jobs:
           java-version: '17'
       - name: Configurar Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - name: Instalar Godot e templates oficiais
         shell: bash
         run: |
@@ -35,8 +37,7 @@ jobs:
           chmod +x "Godot_v${GODOT_VERSION}-stable_linux.x86_64"
           sudo mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot
           curl -fL --retry 3 -o templates.tpz "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
-          mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
-          mkdir -p template-extract
+          mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable" template-extract
           unzip -q templates.tpz -d template-extract
           cp template-extract/templates/* "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/"
           godot --version
