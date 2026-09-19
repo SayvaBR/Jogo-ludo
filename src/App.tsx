@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { App as NativeApp } from '@capacitor/app';
-import { Board, PALETTE } from './board';
-import { bestCpuMove, COLORS, FINISH, loadGame, move, newGame, roll, type Game } from './engine';
+import { Board, PALETTE, tokenPoint } from './board';
+import { bestCpuMove, COLORS, FINISH, loadGame, move, newGame, onlyLegalMove, roll, type Game } from './engine';
 import './style.css';
+import './board-v2.css';
 
 const SAVE = 'ludo-react-save-v2';
 const SETTINGS = 'ludo-react-settings';
@@ -26,6 +27,34 @@ function chime(kind: 'roll' | 'move' | 'capture' | 'win', enabled: boolean) {
   } catch { /* audio is optional on devices without Web Audio */ }
 }
 const pause = (ms:number)=>new Promise<void>(resolve=>setTimeout(resolve,ms));
+/** Animate SVG transforms on the browser's paint clock, not through React state/setTimeout. */
+async function animateRoute(color: number, token: number, from: number, to: number): Promise<void> {
+  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+  const pawn = document.querySelector<SVGGElement>('[data-animated-pawn="true"]');
+  if (!pawn || document.hidden) return;
+  let previous = from;
+  const route = from === -1 ? [0] : Array.from({length: to-from}, (_,i)=>from+i+1);
+  for (const progress of route) {
+    const start = tokenPoint(color, token, previous);
+    const end = tokenPoint(color, token, progress);
+    await new Promise<void>(resolve=>{
+      const duration = from === -1 ? 190 : 115;
+      let began: number | null = null;
+      const frame = (time: number) => {
+        if (began === null) began=time;
+        const t = Math.min(1,(time-began)/duration);
+        const eased = t*t*(3-2*t);
+        const x=start[0]+(end[0]-start[0])*eased;
+        const y=start[1]+(end[1]-start[1])*eased-Math.sin(t*Math.PI)*6;
+        pawn.setAttribute('transform',`translate(${x.toFixed(2)} ${y.toFixed(2)})`);
+        if (t<1 && !document.hidden) requestAnimationFrame(frame);
+        else {pawn.setAttribute('transform',`translate(${end[0]} ${end[1]})`);resolve();}
+      };
+      requestAnimationFrame(frame);
+    });
+    previous=progress;
+  }
+}
 const dots: Record<number,number[][]> = {1:[[1,1]],2:[[0,0],[2,2]],3:[[0,0],[1,1],[2,2]],4:[[0,0],[2,0],[0,2],[2,2]],5:[[0,0],[2,0],[1,1],[0,2],[2,2]],6:[[0,0],[0,1],[0,2],[2,0],[2,1],[2,2]]};
 function Dice({value,rolling,disabled,onClick}: {value:number;rolling:boolean;disabled:boolean;onClick:()=>void}) {
   return <button className={`dice ${rolling?'dice--rolling':''}`} onClick={onClick} disabled={disabled} aria-label={value?`Dado ${value}. Lançar dado`:'Lançar dado'}>
@@ -73,20 +102,28 @@ export default function App() {
     if(!game||lock.current||page!=='game'||modal||game.phase!=='choose')return;
     const result=move(game,token); if(!result)return;
     lock.current=true;setBusy(true);
-    if(!settings.reduced){
+    if(!settings.reduced && !window.matchMedia('(prefers-reduced-motion: reduce)').matches){
       const color=game.current;
       setAnimation({color,token,progress:result.from});
-      const route=result.from===-1?[0]:Array.from({length:result.to-result.from},(_,i)=>result.from+i+1);
-      for(const progress of route){setAnimation({color,token,progress});await pause(75);}
-      setAnimation(null);
+      await animateRoute(color,token,result.from,result.to);
     }
     setGame(result.state);
+    setAnimation(null);
     chime(result.event==='capture'?'capture':result.event==='win'?'win':'move',settings.sound);
     if(result.event==='capture'||result.event==='win')navigator.vibrate?.(result.event==='win'?[60,40,90]:35);
     setBusy(false);lock.current=false;
   },[game,page,modal,settings.reduced,settings.sound]);
+  // Human and CPU share the same deterministic forced-move flow.
+  useEffect(()=>{
+    if(page!=='game'||!game||modal||busy||lock.current)return;
+    const forced = onlyLegalMove(game);
+    if(forced===null)return;
+    const timer=setTimeout(()=>{void playToken(forced);},settings.reduced?80:280);
+    return ()=>clearTimeout(timer);
+  },[game,page,modal,busy,playToken,settings.reduced]);
   useEffect(()=>{
     if(page!=='game'||!game||modal||busy||lock.current||game.phase==='finished'||!game.cpu.includes(game.current))return;
+    if(game.phase==='choose'&&onlyLegalMove(game)!==null)return;
     const timer=setTimeout(()=>{if(game.phase==='roll')void rollDie();else {const token=bestCpuMove(game);if(token>=0)void playToken(token);}},600);
     return ()=>clearTimeout(timer);
   },[game,page,modal,busy,rollDie,playToken]);
@@ -111,7 +148,7 @@ export default function App() {
       <div className="player-grid">{game.seats.map(color=><div key={color} className={`player-pill ${game.current===color?'player-pill--active':''}`} style={{'--color':PALETTE[color]} as React.CSSProperties}><i className="player-color"/><div><strong>{COLORS[color]}</strong><small>{game.cpu.includes(color)?'CPU':'JOGADOR'} • {game.pieces[color].filter(p=>p===FINISH).length}/4</small></div>{game.current===color&&<span className="current-arrow">●</span>}</div>)}</div>
       <div className="turn-banner"><span className="turn-indicator" style={{backgroundColor:PALETTE[game.current]}}/><div><strong>{finished?`${COLORS[game.winner]} venceu!`:`Vez de ${COLORS[game.current]}`}</strong><span>{game.message}</span></div></div>
       <div className="board-wrap"><Board state={game} animated={animation} onToken={token=>{if(!busy)void playToken(token);}} /></div>
-      <div className="game-controls"><div className="dice-info"><span className="eyebrow">{game.phase==='choose'?'ESCOLHA UMA PEÇA':'SUA JOGADA'}</span><strong>{game.phase==='finished'?'Fim de jogo':game.phase==='choose'?`Avance ${game.die} casas`:game.cpu.includes(game.current)?'CPU pensando…':'Role o dado'}</strong><small>{game.bankSixes&&game.bank.length?`Fila de dados: ${game.bank.join(' · ')}`:game.sixStreak?`${game.sixStreak} seis consecutivo(s)`: 'Toque no dado para lançar'}</small></div><Dice value={game.die||1} rolling={rolling} disabled={busy||modal||game.phase!=='roll'||game.cpu.includes(game.current)} onClick={()=>void rollDie()}/></div>
+      <div className="game-controls"><div className="dice-info"><span className="eyebrow">{game.phase==='choose'?'ESCOLHA UMA PEÇA':'SUA JOGADA'}</span><strong>{game.phase==='finished'?'Fim de jogo':game.phase==='choose'?onlyLegalMove(game)!==null?`Movendo ${game.die} casas…`:`Avance ${game.die} casas`:game.cpu.includes(game.current)?'CPU pensando…':'Role o dado'}</strong><small>{game.bankSixes&&game.bank.length?`Fila de dados: ${game.bank.join(' · ')}`:game.sixStreak?`${game.sixStreak} seis consecutivo(s)`: 'Toque no dado para lançar'}</small></div><Dice value={game.die||1} rolling={rolling} disabled={busy||modal||game.phase!=='roll'||game.cpu.includes(game.current)} onClick={()=>void rollDie()}/></div>
       {finished&&<button className="primary victory-button" onClick={()=>start(game.seats.length,game.cpu.length>0)}>JOGAR NOVAMENTE →</button>}
     </section>}
     {modal&&<div className="modal-backdrop" onClick={()=>setModal(false)}><div className="pause-modal" role="dialog" aria-modal="true" aria-label="Partida pausada" onClick={e=>e.stopPropagation()}><span className="pause-icon">Ⅱ</span><h2>Partida pausada</h2><p>Sua partida está salva automaticamente.</p><button className="primary" onClick={()=>setModal(false)}>CONTINUAR PARTIDA</button><button className="secondary" onClick={()=>{if(lock.current)return;setModal(false);setPage('menu');}}>VOLTAR AO MENU</button><button className="danger" onClick={reset}>Apagar partida salva</button></div></div>}

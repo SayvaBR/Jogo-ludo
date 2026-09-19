@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { newGame, roll, move, square, legalMoves, loadGame, bestCpuMove, FINISH, OUT } from './engine.ts';
+import { newGame, roll, move, square, legalMoves, loadGame, bestCpuMove, onlyLegalMove, FINISH, OUT } from './engine.ts';
 
 test('opposite seats and 4 tokens per player', () => {
   const s = newGame(2);
@@ -77,4 +77,71 @@ test('CPU legal, save validated and corrupt save rejected', () => {
   assert.equal(loadGame('{oops'),null);
   s.pieces[0][0] = 100;
   assert.equal(loadGame(JSON.stringify(s)),null);
+});
+test('capture grants another roll instead of passing to the next player', () => {
+  const s = newGame(2);
+  s.pieces[0][0] = 13;
+  s.pieces[2][1] = 40;
+  const result = move(roll(s,1),0)!;
+  assert.equal(result.event, 'capture');
+  assert.equal(result.state.current, 0);
+  assert.equal(result.state.phase, 'roll');
+  assert.equal(result.state.die, 0);
+  assert.match(result.state.message, /Captura/);
+  assert.equal(roll(result.state,3).phase, 'choose');
+});
+test('a token reaching the center gets an extra roll, but winning ends the game', () => {
+  const s = newGame(2);
+  s.pieces[0] = [56, OUT, OUT, OUT];
+  const result = move(roll(s,1),0)!;
+  assert.equal(result.event,'finish');
+  assert.equal(result.state.current,0);
+  assert.equal(result.state.phase,'roll');
+  assert.match(result.state.message,/Peão chegou/);
+  s.pieces[0] = [56,FINISH,FINISH,FINISH];
+  assert.equal(move(roll(s,1),0)!.state.phase, 'finished');
+});
+test('automatic move is available only when exactly one token is legal', () => {
+  const s = newGame(2);
+  assert.equal(onlyLegalMove(s),null);
+  s.pieces[0] = [20,OUT,FINISH,FINISH];
+  const forced = roll(s,2);
+  assert.equal(onlyLegalMove(forced),0);
+  assert.equal(move(forced,onlyLegalMove(forced)!)!.to,22);
+  const six = roll(s,6);
+  assert.equal(onlyLegalMove(six),null);
+  const atEnd = newGame(2);
+  atEnd.pieces[0] = [56,FINISH,FINISH,FINISH];
+  assert.equal(onlyLegalMove(roll(atEnd,1)),0);
+});
+test('a capture bonus does not discard the remaining banked dice', () => {
+  const s = newGame(2,false,true);
+  s.pieces[0][0]=13;
+  s.pieces[2][0]=40;
+  s.bank=[1,2]; s.die=1; s.phase='choose';
+  const captured=move(s,0)!;
+  assert.equal(captured.state.phase,'roll');
+  assert.deepEqual(captured.state.bank,[2]);
+  const bonus=roll(captured.state,3);
+  assert.equal(bonus.phase,'choose');
+  assert.equal(bonus.die,2);
+  assert.deepEqual(bonus.bank,[2,3]);
+  const resumed=move(bonus,0)!.state;
+  assert.equal(resumed.die,3);
+  assert.equal(resumed.phase,'choose');
+  assert.equal(move(resumed,0)!.state.current,2);
+});
+test('safe-square landing never awards capture bonus and a six awards one throw', () => {
+  const s = newGame(2);
+  s.pieces[0][0]=51;
+  s.pieces[2][0]=26;
+  const result=move(roll(s,1),0)!;
+  assert.equal(result.captured.length,0);
+  assert.equal(result.state.current,2);
+  const six=newGame(2);
+  six.pieces[0][0]=13;
+  six.pieces[2][0]=45;
+  const hit=move(roll(six,6),0)!;
+  assert.equal(hit.captured.length,1);
+  assert.equal(hit.state.phase,'roll');
 });

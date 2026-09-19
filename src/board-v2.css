@@ -1,0 +1,9 @@
+/* Mobile board v2: raised tabletop and paint-clock pawn animation. */
+.board-wrap{background:linear-gradient(145deg,#364e78,#182b49 52%,#101b32);padding:9px;border-radius:28px;border:1px solid #536a8c;box-shadow:0 7px 0 #060b17,0 18px 32px #0006;isolation:isolate}
+.ludo-board{border-radius:21px;contain:layout paint;overflow:hidden}
+.pawn{touch-action:manipulation}
+.pawn--active{filter:drop-shadow(0 0 4px #fff)}
+.pawn--clickable:focus-visible{outline:none;filter:drop-shadow(0 0 8px white)}
+.pawn--clickable{cursor:pointer}
+[data-animated-pawn="true"]{pointer-events:none;will-change:transform}
+@media(max-width:380px){.board-wrap{padding:5px;border-radius:19px}.match{gap:9px}.player-grid{gap:5px}.player-pill{padding:7px}.turn-banner{padding:7px 9px}}
