@@ -2,7 +2,7 @@ import type { Game } from './engine';
 import { FINISH, legalMoves, OUT, SAFE, square, STARTS } from './engine';
 
 export type Point = readonly [number, number];
-export const PALETTE = ['#ff5577', '#4b9eff', '#ffd05d', '#40d9b0'] as const;
+export const PALETTE = ['#f44968', '#358df4', '#ffc547', '#2ac49d'] as const;
 const TRACK: Point[] = [[6,1],[6,2],[6,3],[6,4],[6,5],[5,6],[4,6],[3,6],[2,6],[1,6],[0,6],[0,7],[0,8],[1,8],[2,8],[3,8],[4,8],[5,8],[6,9],[6,10],[6,11],[6,12],[6,13],[6,14],[7,14],[8,14],[8,13],[8,12],[8,11],[8,10],[8,9],[9,8],[10,8],[11,8],[12,8],[13,8],[14,8],[14,7],[14,6],[13,6],[12,6],[11,6],[10,6],[9,6],[8,5],[8,4],[8,3],[8,2],[8,1],[8,0],[7,0],[6,0]];
 const LANES: Point[][] = [[[7,1],[7,2],[7,3],[7,4],[7,5]],[[1,7],[2,7],[3,7],[4,7],[5,7]],[[7,13],[7,12],[7,11],[7,10],[7,9]],[[13,7],[12,7],[11,7],[10,7],[9,7]]];
 const YARDS: Point[][] = [[[2,2],[4,2],[2,4],[4,4]],[[2,10],[4,10],[2,12],[4,12]],[[10,10],[12,10],[10,12],[12,12]],[[10,2],[12,2],[10,4],[12,4]]];
@@ -14,13 +14,23 @@ export function tokenPoint(color: number, token: number, progress: number): Poin
   if (progress < 52) return xy(TRACK[square(color,progress)]);
   return xy(LANES[color][progress-52]);
 }
-function Piece({color, point, active, onClick, id}: {color:number; point:Point; active:boolean; onClick?:()=>void; id:string}) {
-  return <g className={`pawn ${active ? 'pawn--active' : ''} ${onClick ? 'pawn--clickable' : ''}`} transform={`translate(${point[0]} ${point[1]})`} onClick={onClick} role={onClick ? 'button' : undefined} aria-label={onClick ? `Mover peão ${id}` : undefined} tabIndex={onClick ? 0 : undefined} onKeyDown={onClick ? e => {if(e.key==='Enter'||e.key===' '){e.preventDefault();onClick();}} : undefined}>
-    {active && <circle className="pawn-pulse" r="24" fill={PALETTE[color]} opacity=".32"/>}
-    <circle cy="3" r="17" fill="#0b1733" opacity=".4"/>
-    <circle r="15.5" fill={PALETTE[color]} stroke="#182544" strokeWidth="2.5"/>
-    <ellipse cx="-4" cy="-6" rx="5" ry="3" transform="rotate(-28 -4 -6)" fill="white" opacity=".85"/>
-    <circle r="19" fill="transparent" stroke="transparent" strokeWidth="15"/>
+function star(x:number,y:number,outer:number,inner=outer*.5):string {
+  let path='';
+  for (let i=0;i<10;i++){
+    const angle=-Math.PI/2+i*Math.PI/5;
+    const radius=i%2?inner:outer;
+    path+=`${i?'L':'M'}${(x+Math.cos(angle)*radius).toFixed(2)} ${(y+Math.sin(angle)*radius).toFixed(2)} `;
+  }
+  return `${path}Z`;
+}
+function Piece({color, point, active, onClick, id, animated=false}: {color:number; point:Point; active:boolean; onClick?:()=>void; id:string; animated?:boolean}) {
+  return <g className={`pawn ${active ? 'pawn--active' : ''} ${onClick ? 'pawn--clickable' : ''}`} transform={`translate(${point[0]} ${point[1]})`} data-animated-pawn={animated ? 'true': undefined} onClick={onClick} role={onClick ? 'button' : undefined} aria-label={onClick ? `Mover peão ${id}` : undefined} tabIndex={onClick ? 0 : undefined} onKeyDown={onClick ? e => {if(e.key==='Enter'||e.key===' '){e.preventDefault();onClick();}} : undefined}>
+    {active && <><circle className="pawn-pulse" r="25" fill={PALETTE[color]} opacity=".3"/><circle r="20" fill="none" stroke="#fff" strokeWidth="2.5" opacity=".95"/></>}
+    <ellipse cy="5" rx="16" ry="13" fill="#111a36" opacity=".26"/>
+    <circle cy="-1" r="15.5" fill={`url(#pawn-${color})`} stroke="#172442" strokeWidth="2"/>
+    <path d="M -10 -8 Q -3 -14 5 -11" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" opacity=".65"/>
+    <text x="0" y="5" textAnchor="middle" fontSize="13" fontWeight="900" fill={color===2?'#553d19':'#fff'} stroke={color===2?'#fff4c9':'#13213f'} strokeWidth=".45" paintOrder="stroke">{id.split('-').at(-1)}</text>
+    <circle r="21" fill="transparent" stroke="transparent" strokeWidth="12"/>
   </g>;
 }
 export function Board({state, animated, onToken}: {state: Game;animated: { color: number; token: number; progress: number } | null;onToken:(token:number)=>void}) {
@@ -39,24 +49,67 @@ export function Board({state, animated, onToken}: {state: Game;animated: { color
     if(peers.length<2) return [0,0];
     const idx=peers.findIndex(p=>p[0]===color&&p[1]===token);
     const angle=2*Math.PI*idx/peers.length;
-    return [Math.cos(angle)*7,Math.sin(angle)*7];
+    const radius=peers.length===2?9:peers.length<5?11:13;
+    return [Math.cos(angle)*radius,Math.sin(angle)*radius];
   };
-  return <svg className="ludo-board" viewBox="-5 -5 610 610" role="group" aria-label="Tabuleiro de Ludo com quatro bases e percurso de 52 casas">
-    <defs><filter id="board-shadow"><feDropShadow dx="0" dy="4" stdDeviation="5" floodColor="#101933" floodOpacity=".25"/></filter></defs>
-    <rect width="600" height="600" rx="22" fill="#f7f9ff"/>
-    {[0,1,2,3].map(color => {
-      const [x,y] = ([[0,0],[0,9],[9,9],[9,0]] as Point[])[color];
-      return <g key={color}><rect x={x*40} y={y*40} width="240" height="240" fill={PALETTE[color]}/><rect x={x*40+26} y={y*40+26} width="188" height="188" rx="32" fill="#fff"/>{YARDS[color].map(([px,py],index)=><g key={index}><circle cx={px*40+20} cy={py*40+20} r="21" fill={PALETTE[color]} opacity=".25"/><circle cx={px*40+20} cy={py*40+20} r="17" fill="#fff" stroke={PALETTE[color]} strokeWidth="3"/></g>)}</g>;
-    })}
-    {TRACK.map(([x,y],i) => <g key={i}><rect x={x*40+.6} y={y*40+.6} width="38.8" height="38.8" fill={STARTS.includes(i as never)?PALETTE[STARTS.indexOf(i as never)] : SAFE.has(i)?'#deebff':'#fff'} stroke="#d1dbeb" strokeWidth="1.2"/>{SAFE.has(i) && <path d={`M ${x*40+20} ${y*40+10} L ${x*40+23} ${y*40+17} L ${x*40+31} ${y*40+18} L ${x*40+25} ${y*40+23} L ${x*40+27} ${y*40+31} L ${x*40+20} ${y*40+27} L ${x*40+13} ${y*40+31} L ${x*40+15} ${y*40+23} L ${x*40+9} ${y*40+18} L ${x*40+17} ${y*40+17} Z`} fill={STARTS.includes(i as never)?'#fff':'#8fa8da'}/>}</g>)}
-    {LANES.map((lane,color)=>lane.map(([x,y],i)=><rect key={`${color}-${i}`} x={x*40+.5} y={y*40+.5} width="39" height="39" fill={PALETTE[color]} opacity=".85" stroke="#fff" strokeWidth="1.3"/>))}
-    <g><path d="M240 240 H360 L300 300 Z" fill={PALETTE[3]}/><path d="M240 240 V360 L300 300 Z" fill={PALETTE[0]}/><path d="M240 360 H360 L300 300 Z" fill={PALETTE[1]}/><path d="M360 240 V360 L300 300 Z" fill={PALETTE[2]}/><circle cx="300" cy="300" r="13" fill="#fff" opacity=".9"/></g>
-    {state.seats.flatMap(color=>state.pieces[color].map((progress,token)=>{
+  const pieces=state.seats.flatMap(color=>state.pieces[color].map((progress,token)=>({color,token,progress,active:color===state.current&&options.includes(token)})));
+  pieces.sort((a,b)=>Number(a.active)-Number(b.active));
+  return <svg className="ludo-board" viewBox="-12 -12 624 624" role="group" aria-label="Tabuleiro de Ludo com quatro bases, casas seguras e percurso de 52 casas">
+    <defs>
+      <linearGradient id="board-ground" x2="0" y2="1"><stop stopColor="#fff"/><stop offset="1" stopColor="#e8eefb"/></linearGradient>
+      {PALETTE.map((color,i)=><linearGradient key={i} id={`pawn-${i}`} x1="0" x2=".8" y1="0" y2="1"><stop stopColor="#fff" stopOpacity=".7"/><stop offset=".25" stopColor={color}/><stop offset="1" stopColor={color}/></linearGradient>)}
+      <clipPath id="board-clip"><rect x="0" y="0" width="600" height="600" rx="19"/></clipPath>
+    </defs>
+    <rect x="-9" y="-6" width="618" height="620" rx="29" fill="#090f20" opacity=".3"/>
+    <rect x="-7" y="-9" width="614" height="614" rx="26" fill="#f9fcff" stroke="#a9b9d4" strokeWidth="3"/>
+    <g clipPath="url(#board-clip)">
+      <rect width="600" height="600" fill="url(#board-ground)"/>
+      {[0,1,2,3].map(color => {
+        const [x,y] = ([[0,0],[0,9],[9,9],[9,0]] as Point[])[color];
+        const left=x*40, top=y*40;
+        return <g key={color}>
+          <rect x={left} y={top} width="240" height="240" fill={PALETTE[color]}/>
+          <circle cx={left+34} cy={top+30} r="98" fill="#fff" opacity=".095"/>
+          <circle cx={left+222} cy={top+220} r="94" fill="#11182e" opacity=".07"/>
+          <rect x={left+23} y={top+23} width="194" height="194" rx="29" fill="#101a35" opacity=".19"/>
+          <rect x={left+23} y={top+19} width="194" height="194" rx="29" fill="#fff" stroke="#fff" strokeWidth="3"/>
+          <rect x={left+32} y={top+28} width="176" height="176" rx="22" fill={PALETTE[color]} opacity=".075"/>
+          <text x={left+120} y={top+57} textAnchor="middle" fontSize="12" fontWeight="1000" letterSpacing="4" fill="#40516f">BASE</text>
+          {YARDS[color].map((point,index)=>{
+            const [cx,cy]=xy(point);
+            return <g key={index}><circle cx={cx} cy={cy+2} r="22" fill="#25344e" opacity=".13"/><circle cx={cx} cy={cy} r="21" fill="#fff" stroke={PALETTE[color]} strokeWidth="3"/><circle cx={cx} cy={cy} r="16" fill={PALETTE[color]} opacity=".1"/><circle cx={cx} cy={cy} r="10" fill={PALETTE[color]} opacity=".16"/></g>;
+          })}
+        </g>;
+      })}
+      {TRACK.map(([x,y],i) => {
+        const start=STARTS.indexOf(i as typeof STARTS[number]);
+        const safe=SAFE.has(i);
+        const fill=start>=0?PALETTE[start]:safe?'#e0eaff':'#fff';
+        return <g key={i}>
+          <rect x={x*40+.9} y={y*40+2.3} width="38.2" height="37" rx="4" fill="#b4bfd0" opacity=".8"/>
+          <rect x={x*40+1} y={y*40+1} width="38" height="36.5" rx="4" fill={fill} stroke={start>=0?'#ffffff':'#cbd6e8'} strokeWidth="1.2"/>
+          {safe && <path d={star(x*40+20,y*40+19.5,11,5.4)} fill={start>=0?'#fff':'#7d9ecf'}/>}
+          {!safe && <circle cx={x*40+20} cy={y*40+19.5} r="2" fill="#d3dded"/>}
+        </g>;
+      })}
+      {LANES.map((lane,color)=>lane.map(([x,y],i)=><g key={`${color}-${i}`}><rect x={x*40+1} y={y*40+2} width="38" height="36" rx="4" fill="#111a36" opacity=".12"/><rect x={x*40+1} y={y*40+1} width="38" height="35.5" rx="4" fill={PALETTE[color]} stroke="#fff" strokeWidth="1.2"/><circle cx={x*40+20} cy={y*40+18.5} r="3" fill="#fff" opacity=".55"/></g>))}
+      <g>
+        <rect x="241" y="241" width="118" height="118" rx="5" fill="#fff"/>
+        <path d="M240 240 H360 L300 300 Z" fill={PALETTE[0]}/>
+        <path d="M240 240 V360 L300 300 Z" fill={PALETTE[1]}/>
+        <path d="M240 360 H360 L300 300 Z" fill={PALETTE[2]}/>
+        <path d="M360 240 V360 L300 300 Z" fill={PALETTE[3]}/>
+        <path d={star(300,300,25,12)} fill="#fff" stroke="#273956" strokeWidth="2"/>
+        <circle cx="300" cy="300" r="5" fill="#ffd05d"/>
+      </g>
+    </g>
+    {pieces.map(({color,token,progress,active})=>{
       if(animated?.color===color && animated.token===token) return null;
       const point=tokenPoint(color,token,progress); const [dx,dy]=offset(color,token,progress);
-      return <Piece key={`${color}-${token}`} id={`${color+1}-${token+1}`} color={color} point={[point[0]+dx,point[1]+dy]} active={color===state.current&&options.includes(token)} onClick={color===state.current&&options.includes(token)?()=>onToken(token):undefined}/>;
-    }))}
-    {animated&&<Piece id="animado" color={animated.color} point={tokenPoint(animated.color,animated.token,animated.progress)} active={false}/>}
-    <rect x="1.5" y="1.5" width="597" height="597" rx="20" fill="none" stroke="#101b35" strokeWidth="3"/>
+      return <Piece key={`${color}-${token}`} id={`${color+1}-${token+1}`} color={color} point={[point[0]+dx,point[1]+dy]} active={active} onClick={active?()=>onToken(token):undefined}/>;
+    })}
+    {animated&&<Piece id={`${animated.color+1}-${animated.token+1}`} color={animated.color} point={tokenPoint(animated.color,animated.token,animated.progress)} active={false} animated/>}
+    <rect x=".75" y=".75" width="598.5" height="598.5" rx="19" fill="none" stroke="#fff" strokeWidth="2.5"/>
+    <rect x="-7" y="-9" width="614" height="614" rx="26" fill="none" stroke="#a9b9d4" strokeWidth="3"/>
   </svg>;
 }
