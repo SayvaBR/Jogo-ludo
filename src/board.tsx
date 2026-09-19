@@ -1,19 +1,9 @@
 import type { Game } from './engine';
-import { FINISH, legalMoves, OUT, SAFE, square, STARTS } from './engine';
-
-export type Point = readonly [number, number];
+import { legalMoves, SAFE, square, STARTS } from './engine';
+import { TRACK, LANES, YARDS, tokenPoint, type Point } from './board-path';
+export { tokenPoint } from './board-path';
 export const PALETTE = ['#f44968', '#358df4', '#ffc547', '#2ac49d'] as const;
-const TRACK: Point[] = [[6,1],[6,2],[6,3],[6,4],[6,5],[5,6],[4,6],[3,6],[2,6],[1,6],[0,6],[0,7],[0,8],[1,8],[2,8],[3,8],[4,8],[5,8],[6,9],[6,10],[6,11],[6,12],[6,13],[6,14],[7,14],[8,14],[8,13],[8,12],[8,11],[8,10],[8,9],[9,8],[10,8],[11,8],[12,8],[13,8],[14,8],[14,7],[14,6],[13,6],[12,6],[11,6],[10,6],[9,6],[8,5],[8,4],[8,3],[8,2],[8,1],[8,0],[7,0],[6,0]];
-const LANES: Point[][] = [[[7,1],[7,2],[7,3],[7,4],[7,5]],[[1,7],[2,7],[3,7],[4,7],[5,7]],[[7,13],[7,12],[7,11],[7,10],[7,9]],[[13,7],[12,7],[11,7],[10,7],[9,7]]];
-const YARDS: Point[][] = [[[2,2],[4,2],[2,4],[4,4]],[[2,10],[4,10],[2,12],[4,12]],[[10,10],[12,10],[10,12],[12,12]],[[10,2],[12,2],[10,4],[12,4]]];
-const FINISH_OFFSETS: Point[] = [[-10,-10],[-10,10],[10,10],[10,-10]];
-const xy = ([x,y]: Point): Point => [x*40+20,y*40+20];
-export function tokenPoint(color: number, token: number, progress: number): Point {
-  if (progress === OUT) return xy(YARDS[color][token]);
-  if (progress === FINISH) return [300+FINISH_OFFSETS[color][0],300+FINISH_OFFSETS[color][1]];
-  if (progress < 52) return xy(TRACK[square(color,progress)]);
-  return xy(LANES[color][progress-52]);
-}
+
 function star(x:number,y:number,outer:number,inner=outer*.5):string {
   let path='';
   for (let i=0;i<10;i++){
@@ -38,12 +28,12 @@ export function Board({state, animated, onToken}: {state: Game;animated: { color
   const positions = new Map<string, Point[]>();
   for (const color of state.seats) for(let token=0;token<4;token++) {
     const p=state.pieces[color][token];
-    if(p<0 || p===FINISH) continue;
+    if(p<0 || p===57) continue;
     const key = p < 52 ? `t${square(color,p)}` : `h${color}-${p}`;
     positions.set(key,[...(positions.get(key) || []),[color,token]]);
   }
   const offset = (color: number, token: number, progress: number): Point => {
-    if(progress<0 || progress===FINISH) return [0,0];
+    if(progress<0 || progress===57) return [0,0];
     const key=progress<52 ? `t${square(color,progress)}` : `h${color}-${progress}`;
     const peers=positions.get(key) || [];
     if(peers.length<2) return [0,0];
@@ -76,7 +66,7 @@ export function Board({state, animated, onToken}: {state: Game;animated: { color
           <rect x={left+32} y={top+28} width="176" height="176" rx="22" fill={PALETTE[color]} opacity=".075"/>
           <text x={left+120} y={top+57} textAnchor="middle" fontSize="12" fontWeight="1000" letterSpacing="4" fill="#40516f">BASE</text>
           {YARDS[color].map((point,index)=>{
-            const [cx,cy]=xy(point);
+            const [cx,cy]=[point[0]*40+20,point[1]*40+20];
             return <g key={index}><circle cx={cx} cy={cy+2} r="22" fill="#25344e" opacity=".13"/><circle cx={cx} cy={cy} r="21" fill="#fff" stroke={PALETTE[color]} strokeWidth="3"/><circle cx={cx} cy={cy} r="16" fill={PALETTE[color]} opacity=".1"/><circle cx={cx} cy={cy} r="10" fill={PALETTE[color]} opacity=".16"/></g>;
           })}
         </g>;
@@ -95,10 +85,10 @@ export function Board({state, animated, onToken}: {state: Game;animated: { color
       {LANES.map((lane,color)=>lane.map(([x,y],i)=><g key={`${color}-${i}`}><rect x={x*40+1} y={y*40+2} width="38" height="36" rx="4" fill="#111a36" opacity=".12"/><rect x={x*40+1} y={y*40+1} width="38" height="35.5" rx="4" fill={PALETTE[color]} stroke="#fff" strokeWidth="1.2"/><circle cx={x*40+20} cy={y*40+18.5} r="3" fill="#fff" opacity=".55"/></g>))}
       <g>
         <rect x="241" y="241" width="118" height="118" rx="5" fill="#fff"/>
-        <path d="M240 240 H360 L300 300 Z" fill={PALETTE[0]}/>
-        <path d="M240 240 V360 L300 300 Z" fill={PALETTE[1]}/>
-        <path d="M240 360 H360 L300 300 Z" fill={PALETTE[2]}/>
-        <path d="M360 240 V360 L300 300 Z" fill={PALETTE[3]}/>
+        <path d="M240 240 H360 L300 300 Z" fill={PALETTE[3]}/>
+        <path d="M240 240 V360 L300 300 Z" fill={PALETTE[0]}/>
+        <path d="M240 360 H360 L300 300 Z" fill={PALETTE[1]}/>
+        <path d="M360 240 V360 L300 300 Z" fill={PALETTE[2]}/>
         <path d={star(300,300,25,12)} fill="#fff" stroke="#273956" strokeWidth="2"/>
         <circle cx="300" cy="300" r="5" fill="#ffd05d"/>
       </g>
