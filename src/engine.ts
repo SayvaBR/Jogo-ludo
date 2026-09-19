@@ -1,13 +1,15 @@
 /** Pure, immutable Ludo rules. Every change creates a fresh state; no UI dependencies. */
 export const COLORS = ['Vermelho', 'Azul', 'Amarelo', 'Verde'] as const;
-export const STARTS = [0, 13, 26, 39] as const;
-export const SAFE = new Set([0, 8, 13, 21, 26, 34, 39, 47]);
+// Track coordinates run counter-clockwise in board.tsx; gameplay runs in reverse.
+// These four entry cells touch the matching bases: red TL, blue BL, yellow BR, green TR.
+export const STARTS = [10, 23, 36, 49] as const;
+export const SAFE = new Set([2, 10, 15, 23, 28, 36, 41, 49]);
 export const OUT = -1;
 export const FINISH = 57;
 export type Phase = 'roll' | 'choose' | 'finished';
 export type Pieces = [number[], number[], number[], number[]];
 export interface Game {
-  version: 2;
+  version: 3;
   seats: number[];
   cpu: number[];
   pieces: Pieces;
@@ -27,10 +29,10 @@ const copy = (s: Game): Game => ({ ...s, seats: [...s.seats], cpu: [...s.cpu], p
 export function newGame(players = 4, versusCpu = false, bankSixes = false): Game {
   const count = Math.max(2, Math.min(4, Math.floor(players)));
   const seats = count === 2 ? [0, 2] : count === 3 ? [0, 1, 2] : [0, 1, 2, 3];
-  return { version: 2, seats, cpu: versusCpu ? seats.slice(1) : [], pieces: [[-1,-1,-1,-1],[-1,-1,-1,-1],[-1,-1,-1,-1],[-1,-1,-1,-1]], current: seats[0], turn: 0, phase: 'roll', die: 0, sixStreak: 0, bank: [], bankSixes, winner: -1, moves: 0, message: 'Toque no dado para começar.' };
+  return { version: 3, seats, cpu: versusCpu ? seats.slice(1) : [], pieces: [[-1,-1,-1,-1],[-1,-1,-1,-1],[-1,-1,-1,-1],[-1,-1,-1,-1]], current: seats[0], turn: 0, phase: 'roll', die: 0, sixStreak: 0, bank: [], bankSixes, winner: -1, moves: 0, message: 'Toque no dado para começar.' };
 }
 export function square(color: number, progress: number): number {
-  return progress >= 0 && progress < 52 ? (STARTS[color] + progress) % 52 : -1;
+  return progress >= 0 && progress < 52 ? (STARTS[color] - progress + 52) % 52 : -1;
 }
 export function isSafe(color: number, progress: number): boolean { return SAFE.has(square(color, progress)); }
 export function legalMoves(s: Game, die = s.die): number[] {
@@ -130,7 +132,7 @@ export function loadGame(raw: string | null): Game | null {
   if (!raw) return null;
   try {
     const s: Game = JSON.parse(raw);
-    const valid = s.version === 2 && Array.isArray(s.seats) && s.seats.length >= 2 && s.seats.length <= 4 && new Set(s.seats).size === s.seats.length && s.seats.every(c => Number.isInteger(c) && c >= 0 && c <= 3) && Array.isArray(s.cpu) && s.cpu.every(c => s.seats.includes(c) && c !== s.seats[0]) && Array.isArray(s.pieces) && s.pieces.length === 4 && s.pieces.every(p => Array.isArray(p) && p.length === 4 && p.every(n => Number.isInteger(n) && n >= -1 && n <= 57)) && Number.isInteger(s.turn) && s.turn >= 0 && s.turn < s.seats.length && s.current === s.seats[s.turn] && ['roll','choose','finished'].includes(s.phase) && Number.isInteger(s.die) && s.die >= 0 && s.die <= 6 && Number.isInteger(s.sixStreak) && s.sixStreak >= 0 && s.sixStreak < 3 && Array.isArray(s.bank) && s.bank.every(n => Number.isInteger(n) && n >= 1 && n <= 6) && typeof s.bankSixes === 'boolean' && Number.isInteger(s.winner) && (s.winner === -1 || s.seats.includes(s.winner)) && (s.phase === 'finished' ? s.winner !== -1 && s.pieces[s.winner].every(n => n === FINISH) : s.winner === -1) && (s.phase !== 'choose' || legalMoves(s).length > 0) && Number.isInteger(s.moves) && s.moves >= 0 && typeof s.message === 'string';
+    const valid = s.version === 3 && Array.isArray(s.seats) && s.seats.length >= 2 && s.seats.length <= 4 && new Set(s.seats).size === s.seats.length && s.seats.every(c => Number.isInteger(c) && c >= 0 && c <= 3) && Array.isArray(s.cpu) && s.cpu.every(c => s.seats.includes(c) && c !== s.seats[0]) && Array.isArray(s.pieces) && s.pieces.length === 4 && s.pieces.every(p => Array.isArray(p) && p.length === 4 && p.every(n => Number.isInteger(n) && n >= -1 && n <= 57)) && Number.isInteger(s.turn) && s.turn >= 0 && s.turn < s.seats.length && s.current === s.seats[s.turn] && ['roll','choose','finished'].includes(s.phase) && Number.isInteger(s.die) && s.die >= 0 && s.die <= 6 && Number.isInteger(s.sixStreak) && s.sixStreak >= 0 && s.sixStreak < 3 && Array.isArray(s.bank) && s.bank.every(n => Number.isInteger(n) && n >= 1 && n <= 6) && typeof s.bankSixes === 'boolean' && Number.isInteger(s.winner) && (s.winner === -1 || s.seats.includes(s.winner)) && (s.phase === 'finished' ? s.winner !== -1 && s.pieces[s.winner].every(n => n === FINISH) : s.winner === -1) && (s.phase !== 'choose' || legalMoves(s).length > 0) && Number.isInteger(s.moves) && s.moves >= 0 && typeof s.message === 'string';
     return valid ? s : null;
   } catch { return null; }
 }
