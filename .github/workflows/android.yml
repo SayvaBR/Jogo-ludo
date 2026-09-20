@@ -39,19 +39,19 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
-      - name: Publish directly downloadable Android APK (V3)
+      - name: Publish directly downloadable Android APK (V4)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          if gh release view v0.3.0-test >/dev/null 2>&1; then
-            echo 'V3 test release already published; not overwriting the existing APK.'
+          if gh release view v0.4.0-test >/dev/null 2>&1; then
+            echo 'V4 release already published; refusing to replace an existing APK.'
             exit 0
           fi
-          cp android/app/build/outputs/apk/debug/app-debug.apk Ludo-v3.apk
-          gh release create v0.3.0-test Ludo-v3.apk \
+          cp android/app/build/outputs/apk/debug/app-debug.apk Ludo-v4.apk
+          gh release create v0.4.0-test Ludo-v4.apk \
             --target "$GITHUB_SHA" \
-            --title 'Ludo V3 - Android de teste' \
-            --notes 'APK Android de teste: dado com seis faces equiprováveis e entradas/corredores corrigidos. Instale por sua conta; ainda não é versão de publicação na Play Store.' \
+            --title 'Ludo V4 - Android de teste' \
+            --notes 'Redesign premium implementado no jogo: tabuleiro clássico sem nomes/números, menus simplificados, dado tridimensional com animação e áudio renovado. APK de teste, 60 FPS é meta dependente do aparelho.' \
             --prerelease
